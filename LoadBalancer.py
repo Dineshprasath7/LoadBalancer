@@ -1,3 +1,9 @@
+import re
+import time
+from collections import defaultdict
+import logging
+import tkinter as tk
+from tkinter import messagebox
 import sys
 import socket
 import select
@@ -10,17 +16,6 @@ import time
 import threading
 import json
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-##########################################
-'''
-RUNNING MANUAL
-    STEP 1 : START THE LOAD BALANCER
-    STEP 2 : MAKE SURE THE SERVER IS RUNNING
-    STEP 3 : CONNECT TO THE LOAD BALANCER AND SEND REQUESTS OR DATA
-'''
-###########################################
 DEFAULT_SERVER_POOL = [('127.0.0.1', 7777), ('127.0.0.1', 8888), ('127.0.0.1', 9999)]
 DEFAULT_SERVER_WEIGHTS = {('127.0.0.1', 7777): 2, ('127.0.0.1', 8888): 1, ('127.0.0.1', 9999): 1}
 ACTIVE_CONNECTIONS = defaultdict(int)
@@ -28,7 +23,131 @@ OVERLOAD_THRESHOLD = 5  # Max connections before a server is considered overload
 REQUEST_LIMIT_PER_IP = 100  # Limit requests from a single IP address
 CONNECTION_TIMEOUT = 60  # Timeout for idle connections (in seconds)
 
-# Store IP request counts and timestamps for rate limiting
+# Configure logging (corrected)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
+class PacketAnalyzer:
+    """Intrusion Detection System for analyzing incoming packets."""
+
+    def __init__(self, max_packet_size=4096, signature_db=None):
+        self.max_packet_size = max_packet_size
+        self.repetitive_requests = defaultdict(lambda: {"count": 0, "timestamp": time.time()})
+        self.signature_db = signature_db or self.load_signature_database()
+
+        # Time window for repetitive request checking (in seconds)
+        self.time_window = 60
+        self.request_limit = 100  # Max allowed requests per IP within time window
+
+        # Alert counters for attack types
+        self.alert_counters = defaultdict(int)
+
+        # GUI-related attributes for notifications
+        self.root = tk.Tk()  # Create a hidden Tkinter root for messagebox popups
+        self.root.withdraw()  # Hide the root window since we only want pop-ups
+
+    def load_signature_database(self):
+        """Load a simple signature database with predefined malicious patterns."""
+        return [
+            {"name": "SQL Injection", "pattern": r"(\%27)|(\')|(\-\-)|(\%23)|(#)", "description": "SQL Injection Attempt"},
+            {"name": "XSS", "pattern": r"(<script>)", "description": "Cross-Site Scripting Attempt"},
+            {"name": "Command Injection", "pattern": r"(\;|\&\&|\|\|)", "description": "Command Injection Attempt"},
+            {"name": "Path Traversal", "pattern": r"(\.\.)", "description": "Path Traversal Attempt"},
+            {"name": "Malicious File Upload", "pattern": r"(\.php|\.exe|\.sh)", "description": "Potential Malicious File Upload"},
+        ]
+
+    def analyze_packet(self, data, client_ip):
+        """Analyze packet for anomalies, flooding, and known attack patterns."""
+        alerts = []
+
+        # Packet size analysis
+        if len(data) > self.max_packet_size:
+            alerts.append(f"Packet from {client_ip} exceeds max size! Size: {len(data)}")
+            self.send_notification(f"Alert: Packet from {client_ip} exceeds max size! Size: {len(data)}")
+
+        # Check for repetitive requests (potential DoS attack)
+        current_time = time.time()
+        request_info = self.repetitive_requests[client_ip]
+        request_info["count"] += 1
+        request_info["timestamp"] = current_time
+
+        if request_info["count"] > self.request_limit:
+            alerts.append(f"DoS attack suspected from {client_ip}: too many requests.")
+            self.send_notification(f"Alert: DoS attack suspected from {client_ip}: too many requests.")
+
+        # Check for known attack signatures
+        for signature in self.signature_db:
+            if re.search(signature["pattern"], data.decode("utf-8", errors="ignore")):
+                alerts.append(f"{signature['name']} detected from {client_ip}: {signature['description']}")
+                self.send_notification(f"Alert: {signature['name']} detected from {client_ip}: {signature['description']}")
+                self.alert_counters[signature["name"]] += 1  # Update alert counter
+
+        return alerts
+
+    def send_notification(self, message):
+        """Send a notification via GUI pop-up."""
+        logging.warning(message)
+        # Pop-up window to show the notification
+        messagebox.showwarning("Alert", message)  # Pop-up notification window
+
+    def simulate_packet_analysis(self, client_ip, packet_data):
+        """Method to be used in GUI mode for analyzing packets entered by the user."""
+        return self.analyze_packet(packet_data.encode("utf-8", errors="ignore"), client_ip)
+
+
+def main():
+    """Main function to test the PacketAnalyzer with pop-up notifications."""
+    analyzer = PacketAnalyzer(max_packet_size=1024)  # Smaller max packet size for testing
+
+    print("\nPacket Analyzer Testing with Notifications")
+    print("------------------------------------------")
+
+    while True:
+        print("\nChoose a test case:")
+        print("1. SQL Injection Test")
+        print("2. XSS Test")
+        print("3. Oversized Packet Test")
+        print("4. DoS Attack Test")
+        print("5. Custom Packet Test")
+        print("0. Exit")
+
+        choice = input("Enter your choice: ")
+
+        if choice == "0":
+            break
+        elif choice == "1":
+            client_ip = '192.168.1.100'
+            sql_payload = "SELECT * FROM users WHERE username='admin' --"
+            alerts = analyzer.analyze_packet(sql_payload.encode(), client_ip)
+            print("Alerts:", alerts)
+        elif choice == "2":
+            client_ip = '192.168.1.101'
+            xss_payload = "<script>alert('XSS')</script>"
+            alerts = analyzer.analyze_packet(xss_payload.encode(), client_ip)
+            print("Alerts:", alerts)
+        elif choice == "3":
+            client_ip = '192.168.1.102'
+            oversized_payload = "A" * 2048  # Payload larger than max_packet_size
+            alerts = analyzer.analyze_packet(oversized_payload.encode(), client_ip)
+            print("Alerts:", alerts)
+        elif choice == "4":
+            client_ip = '192.168.1.103'
+            dos_payload = "GET /index.html"
+            for _ in range(101):  # Exceed the request limit
+                alerts = analyzer.analyze_packet(dos_payload.encode(), client_ip)
+            print("Alerts:", alerts)
+        elif choice == "5":
+            client_ip = input("Enter the client IP: ")
+            packet_data = input("Enter the packet data: ")
+            alerts = analyzer.analyze_packet(packet_data.encode(), client_ip)
+            print("Alerts:", alerts)
+        else:
+            print("Invalid choice, please try again.")
+
+    print("\nExiting Packet Analyzer.")
+    analyzer.root.quit()  # Close the Tkinter GUI cleanly
+
+
 ip_request_count = defaultdict(lambda: {"count": 0, "timestamp": time.time()})
 
 def least_connections():
@@ -75,7 +194,7 @@ class LoadBalancer:
         self.algorithm = algo
         print(algo)
         self.weights = DEFAULT_SERVER_WEIGHTS.copy()
-
+        self.packet_analyzer = PacketAnalyzer(max_packet_size=4096)
         # Load configuration if a config file is provided
         if config_file:
             self.load_config(config_file)
@@ -173,6 +292,16 @@ class LoadBalancer:
         if remote_socket is None:
             logging.error(f'No remote socket found for {sock.getpeername()}')
             return
+
+        # Extract the client's IP address from the socket
+        client_ip = sock.getpeername()[0]
+
+        # Analyze the packet for potential threats
+        alerts = self.packet_analyzer.analyze_packet(data, client_ip)
+
+        # Display alerts, if any
+        if alerts:
+            logging.info(f'Alerts detected: {alerts}')
 
         start_time = time.time()  # Start timing for response
         try:
