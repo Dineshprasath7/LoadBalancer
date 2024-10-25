@@ -16,6 +16,7 @@ import time
 import threading
 import json
 
+#Strategic Host Intrusion Elimination and Load Distribution
 DEFAULT_SERVER_POOL = [('127.0.0.1', 7777), ('127.0.0.1', 8888), ('127.0.0.1', 9999)]
 DEFAULT_SERVER_WEIGHTS = {('127.0.0.1', 7777): 2, ('127.0.0.1', 8888): 1, ('127.0.0.1', 9999): 1}
 ACTIVE_CONNECTIONS = defaultdict(int)
