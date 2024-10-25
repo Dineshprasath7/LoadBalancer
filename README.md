@@ -1,25 +1,32 @@
-# Load Balancer
+# SHIELD: Strategic Host Intrusion Elimination and Load Distribution
 
-This project provides a Python-based load balancer designed to distribute traffic efficiently. It supports dynamic load balancing algorithms, including:
+## Overview
 
-- Least Connect
-- Weighted Least Connect
-- Least Response Time
+SHIELD is a robust Python-based load balancer designed to intelligently distribute incoming client requests across multiple backend servers while providing an intrusion detection mechanism to analyze packet data for potential threats. This project enhances the availability and security of web services in distributed systems and cloud computing environments.
+---
+## Key Features
 
-## Setup Instructions
+- **Dynamic Load Balancing**: Supports various load balancing algorithms including:
+  - Least Connections
+  - Weighted Round Robin
+  - IP Hashing
+  - Round Robin
+  - Dynamic balancing based on server performance metrics (CPU and memory usage)
 
-Follow these steps to get started with the load balancer:
+- **Intrusion Detection**: Utilizes the `PacketAnalyzer` class to examine incoming packets for known attack signatures, including:
+  - SQL Injection
+  - Cross-Site Scripting (XSS)
+  - Command Injections
+  - Malicious File Uploads
 
-1. **Start the Load Balancer**
+- **Rate Limiting**: Implements a feature to restrict the number of requests from a single IP address, mitigating the risk of Denial-of-Service (DoS) attacks.
 
-   Begin by launching the load balancer application. Ensure that it initializes correctly and is ready to accept traffic.
+- **Health Checks**: Regularly checks the status and responsiveness of backend servers, allowing dynamic adjustment of request routing based on server load.
 
-2. **Verify Server Status**
+- **Real-time Notifications**: Equipped with a GUI notification system to alert administrators about detected anomalies or security threats.
 
-   Confirm that the server(s) you intend to balance traffic to are up and running. The load balancer will need to communicate with these servers to distribute requests properly.
 
-3. **Connect the Client**
+---
 
-   Finally, configure your client to connect to the load balancer. Ensure that the client is set to send traffic to the load balancer’s address.
 
-By following these steps, you will be able to effectively utilize the load balancer to manage and distribute traffic across your servers.
+
